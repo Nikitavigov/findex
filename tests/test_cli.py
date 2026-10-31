@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 
 from typer.testing import CliRunner
 
@@ -12,20 +13,22 @@ def test_cli_help() -> None:
     """Перевірка виклику команди help."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "findex" in result.stdout
-    assert "index" in result.stdout
-    assert "search" in result.stdout
-    assert "stats" in result.stdout
-    assert "crawl" in result.stdout
+    clean_out = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", result.stdout)
+    assert "findex" in clean_out
+    assert "index" in clean_out
+    assert "search" in clean_out
+    assert "stats" in clean_out
+    assert "crawl" in clean_out
 
 
 def test_cli_crawl_help() -> None:
     """Перевірка виклику команди findex crawl --help."""
     result = runner.invoke(app, ["crawl", "--help"])
     assert result.exit_code == 0
-    assert "seed_url" in result.stdout or "URL" in result.stdout
-    assert "concurrency" in result.stdout
-    assert "max-pages" in result.stdout
+    clean_out = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", result.stdout)
+    assert "seed_url" in clean_out or "URL" in clean_out
+    assert "--concurrency" in clean_out
+    assert "--max-pages" in clean_out
 
 
 def test_cli_index_and_search(sample_corpus_dir: Path, tmp_path: Path) -> None:
