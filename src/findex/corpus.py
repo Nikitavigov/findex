@@ -55,7 +55,7 @@ def _iter_jsonl(file_path: Path) -> Iterator[Document]:
 
 def _iter_directory(dir_path: Path) -> Iterator[Document]:
     """Рекурсивне потокове читання текстових файлів з каталогу."""
-    for path in dir_path.rglob("*"):
+    for path in sorted(dir_path.rglob("*")):
         if not path.is_file():
             continue
         if path.name.startswith("."):
