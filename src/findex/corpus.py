@@ -25,6 +25,7 @@ def _read_file_text(file_path: Path) -> str:
 
 def _iter_jsonl(file_path: Path) -> Iterator[Document]:
     """Stream documents from a JSON-lines (.jsonl or .jsonl.gz) file."""
+
     def _parse_lines(stream) -> Iterator[Document]:
         for idx, line in enumerate(stream, start=1):
             line = line.strip()

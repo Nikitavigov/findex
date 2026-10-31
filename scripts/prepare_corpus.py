@@ -3,14 +3,30 @@ import urllib.request
 from pathlib import Path
 
 BOOKS = [
-    ("1342-0.txt", "https://www.gutenberg.org/files/1342/1342-0.txt", "Pride and Prejudice"),
+    (
+        "1342-0.txt",
+        "https://www.gutenberg.org/files/1342/1342-0.txt",
+        "Pride and Prejudice",
+    ),
     ("11-0.txt", "https://www.gutenberg.org/files/11/11-0.txt", "Alice in Wonderland"),
-    ("1661-0.txt", "https://www.gutenberg.org/files/1661/1661-0.txt", "Sherlock Holmes Adventures"),
+    (
+        "1661-0.txt",
+        "https://www.gutenberg.org/files/1661/1661-0.txt",
+        "Sherlock Holmes Adventures",
+    ),
     ("84-0.txt", "https://www.gutenberg.org/files/84/84-0.txt", "Frankenstein"),
-    ("36-0.txt", "https://www.gutenberg.org/files/36/36-0.txt", "The War of the Worlds"),
+    (
+        "36-0.txt",
+        "https://www.gutenberg.org/files/36/36-0.txt",
+        "The War of the Worlds",
+    ),
     ("2701-0.txt", "https://www.gutenberg.org/files/2701/2701-0.txt", "Moby Dick"),
     ("98-0.txt", "https://www.gutenberg.org/files/98/98-0.txt", "A Tale of Two Cities"),
-    ("2591-0.txt", "https://www.gutenberg.org/files/2591/2591-0.txt", "Grimms Fairy Tales"),
+    (
+        "2591-0.txt",
+        "https://www.gutenberg.org/files/2591/2591-0.txt",
+        "Grimms Fairy Tales",
+    ),
 ]
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) findex-corpus-builder/1.0"
@@ -32,7 +48,10 @@ def prepare_gutenberg_corpus(output_dir: Path, target_count: int = 1000) -> None
                 raw_text = resp.read().decode("utf-8", errors="replace")
 
             # Split into chapters or sizable sections
-            sections = re.split(r"\n(?=(?:CHAPTER|Chapter|STORY|Story|BOOK|Book)\s+[0-9IVXLCDM]+)", raw_text)
+            sections = re.split(
+                r"\n(?=(?:CHAPTER|Chapter|STORY|Story|BOOK|Book)\s+[0-9IVXLCDM]+)",
+                raw_text,
+            )
             if len(sections) < 5:
                 # If regex didn't split well, split by double newlines into ~15KB chunks
                 chunks = raw_text.split("\n\n\n")
@@ -56,7 +75,9 @@ def prepare_gutenberg_corpus(output_dir: Path, target_count: int = 1000) -> None
                     continue
                 safe_book = "".join(c if c.isalnum() else "_" for c in book_name)
                 doc_file = output_dir / f"{doc_idx:04d}_{safe_book}_sec.txt"
-                doc_file.write_text(f"# {book_name} - Section {doc_idx}\n\n{sec}", encoding="utf-8")
+                doc_file.write_text(
+                    f"# {book_name} - Section {doc_idx}\n\n{sec}", encoding="utf-8"
+                )
                 doc_idx += 1
                 if doc_idx > target_count:
                     break

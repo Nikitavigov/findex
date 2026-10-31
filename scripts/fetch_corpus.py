@@ -38,7 +38,9 @@ def download_wikipedia_corpus(target_dir: Path, target_count: int = 1000) -> Non
                     if len(extract) < 100:
                         continue
 
-                    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in title)[:80].strip()
+                    safe_title = "".join(
+                        c if c.isalnum() or c in " _-" else "_" for c in title
+                    )[:80].strip()
                     doc_path = target_dir / f"{saved + 1:04d}_{safe_title}.txt"
                     doc_path.write_text(f"# {title}\n\n{extract}", encoding="utf-8")
                     saved += 1
@@ -47,7 +49,12 @@ def download_wikipedia_corpus(target_dir: Path, target_count: int = 1000) -> Non
                     if saved >= target_count:
                         break
             time.sleep(0.3)
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            OSError,
+        ) as e:
             print(f"Error fetching batch: {e}, retrying in 2s...")
             time.sleep(2)
 
