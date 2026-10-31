@@ -1,5 +1,5 @@
 from array import array
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +24,23 @@ class DocMeta:
     source_name: str
     title: str
     length: int
+
+
+@dataclass(order=True, slots=True)
+class SearchResult:
+    """
+    Результат пошуку з оцінкою релевантності.
+    order=True дозволяє автоматично порівнювати за полем score для heapq.nlargest.
+    """
+
+    score: float
+    doc_id: int = field(compare=False)
+    title: str = field(compare=False, default="")
+    source_name: str = field(compare=False, default="")
+    snippet: str = field(compare=False, default="")
+
+    def __str__(self) -> str:
+        return f"[{self.score:.4f}] Doc #{self.doc_id} ({self.title}): {self.snippet}"
 
 
 # Варіант без slots для порівняльного бенчмарку пам'яті
