@@ -56,6 +56,43 @@ def test_cli_search_tfidf(sample_corpus_dir: Path, tmp_path: Path) -> None:
     assert "TFIDF" in res.stdout
 
 
+def test_cli_index_parallel_executors(sample_corpus_dir: Path, tmp_path: Path) -> None:
+    """Перевірка запуску CLI findex index з потоками та процесами."""
+    out_threads = tmp_path / "threads.bin"
+    res_th = runner.invoke(
+        app,
+        [
+            "index",
+            str(sample_corpus_dir),
+            "--out",
+            str(out_threads),
+            "--executor",
+            "threads",
+            "--workers",
+            "2",
+        ],
+    )
+    assert res_th.exit_code == 0
+    assert out_threads.exists()
+
+    out_procs = tmp_path / "procs.bin"
+    res_pr = runner.invoke(
+        app,
+        [
+            "index",
+            str(sample_corpus_dir),
+            "--out",
+            str(out_procs),
+            "--executor",
+            "processes",
+            "--workers",
+            "2",
+        ],
+    )
+    assert res_pr.exit_code == 0
+    assert out_procs.exists()
+
+
 def test_cli_index_nonexistent_path() -> None:
     """CLI повинно повертати код помилки 1, якщо шлях до корпусу не існує."""
     res = runner.invoke(app, ["index", "non_existent_directory_xyz"])

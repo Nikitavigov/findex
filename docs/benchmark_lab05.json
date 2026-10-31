@@ -1,0 +1,152 @@
+[
+  {
+    "executor": "serial",
+    "workers": 1,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.2615617000010388,
+    "cpu": 1.21875,
+    "rss": 99.5234375,
+    "merge": 0.032591700000921264,
+    "speedup": 1.0
+  },
+  {
+    "executor": "threads",
+    "workers": 2,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.5833868000008806,
+    "cpu": 1.59375,
+    "rss": 103.140625,
+    "merge": 0.034675299997616094,
+    "speedup": 0.7967489055740121
+  },
+  {
+    "executor": "threads",
+    "workers": 4,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.6482617000001483,
+    "cpu": 1.578125,
+    "rss": 104.2890625,
+    "merge": 0.043738299998949515,
+    "speedup": 0.765389197601889
+  },
+  {
+    "executor": "threads",
+    "workers": 8,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.6726263999989897,
+    "cpu": 1.703125,
+    "rss": 106.47265625,
+    "merge": 0.03914230000009411,
+    "speedup": 0.7542399785163028
+  },
+  {
+    "executor": "threads",
+    "workers": 12,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.5064687000012782,
+    "cpu": 1.4375,
+    "rss": 108.046875,
+    "merge": 0.04579129999910947,
+    "speedup": 0.8374297454702965
+  },
+  {
+    "executor": "processes",
+    "workers": 1,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 1.1096316000002844,
+    "cpu": 1.078125,
+    "rss": 108.30859375,
+    "merge": 0.025265500000386965,
+    "speedup": 1.136919406405437
+  },
+  {
+    "executor": "processes",
+    "workers": 2,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 2.45199649999995,
+    "cpu": 0.8125,
+    "rss": 115.97265625,
+    "merge": 0.11823699999877135,
+    "speedup": 0.5145038747000922
+  },
+  {
+    "executor": "processes",
+    "workers": 4,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 2.478776399999333,
+    "cpu": 1.0625,
+    "rss": 111.265625,
+    "merge": 0.026612200003000908,
+    "speedup": 0.5089453409357045
+  },
+  {
+    "executor": "processes",
+    "workers": 8,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 3.088624100000743,
+    "cpu": 1.328125,
+    "rss": 111.140625,
+    "merge": 0.14095799999995506,
+    "speedup": 0.40845426933006684
+  },
+  {
+    "executor": "processes",
+    "workers": 12,
+    "runtime": "CPython 3.12 (GIL)",
+    "wall": 3.4943000999992364,
+    "cpu": 1.359375,
+    "rss": 111.921875,
+    "merge": 0.24071550000007846,
+    "speedup": 0.36103415960218027
+  },
+  {
+    "executor": "threads",
+    "workers": 1,
+    "runtime": "CPython 3.13t (No-GIL)",
+    "wall": 3.6470004999973753,
+    "cpu": 3.640625,
+    "rss": 21.073132514953613,
+    "merge": 0.09918300000208546,
+    "speedup": 0.3459176109249085
+  },
+  {
+    "executor": "threads",
+    "workers": 2,
+    "runtime": "CPython 3.13t (No-GIL)",
+    "wall": 9.510011599999416,
+    "cpu": 18.234375,
+    "rss": 23.227614402770996,
+    "merge": 0.14654720000180532,
+    "speedup": 0.13265616836903923
+  },
+  {
+    "executor": "threads",
+    "workers": 4,
+    "runtime": "CPython 3.13t (No-GIL)",
+    "wall": 13.723374000001058,
+    "cpu": 45.0625,
+    "rss": 25.132131576538086,
+    "merge": 0.12019069999951171,
+    "speedup": 0.09192795445208603
+  },
+  {
+    "executor": "threads",
+    "workers": 8,
+    "runtime": "CPython 3.13t (No-GIL)",
+    "wall": 21.569118200000958,
+    "cpu": 120.203125,
+    "rss": 27.75748634338379,
+    "merge": 0.19100470000194036,
+    "speedup": 0.0584892571083867
+  },
+  {
+    "executor": "threads",
+    "workers": 12,
+    "runtime": "CPython 3.13t (No-GIL)",
+    "wall": 24.09551289999945,
+    "cpu": 143.859375,
+    "rss": 29.173556327819824,
+    "merge": 0.17242579999947338,
+    "speedup": 0.052356706629850064
+  }
+]

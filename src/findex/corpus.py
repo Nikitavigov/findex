@@ -18,13 +18,16 @@ class Document:
     metadata: dict[str, Any] = field(default_factory=_empty_metadata)
 
 
-def _read_file_text(file_path: Path) -> str:
+def read_file_text(file_path: Path) -> str:
     """Читати вміст файлу у кодуванні UTF-8, враховуючи можливе стиснення gzip."""
     if file_path.suffix == ".gz":
         with gzip.open(file_path, "rt", encoding="utf-8", errors="replace") as f:
             return f.read()
     with file_path.open("r", encoding="utf-8", errors="replace") as f:
         return f.read()
+
+
+_read_file_text = read_file_text
 
 
 def _iter_jsonl(file_path: Path) -> Iterator[Document]:

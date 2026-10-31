@@ -11,7 +11,8 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from findex.index import build_index, load_index, save_index
+from findex.index import load_index, save_index
+from findex.parallel import build_index_parallel
 from findex.ranking import BM25Scorer, TfIdfScorer
 from findex.search import search_ranked
 from findex.stats import run_eager, run_lazy
@@ -66,6 +67,14 @@ def index_command(
         Literal["pickle", "json"],
         typer.Option("--format", "-f", help="Формат збереження індексу (pickle або json)."),
     ] = "pickle",
+    workers: Annotated[
+        int,
+        typer.Option("--workers", "-w", help="Кількість паралельних воркерів."),
+    ] = 4,
+    executor: Annotated[
+        Literal["serial", "threads", "processes"],
+        typer.Option("--executor", "-e", help="Модель виконання (serial, threads або processes)."),
+    ] = "processes",
     limit: Annotated[
         int | None,
         typer.Option("--limit", "-l", help="Максимальна кількість документів для обробки."),
@@ -82,8 +91,18 @@ def index_command(
         TextColumn("[progress.description]{task.description}"),
         console=err_console,
     ) as progress:
-        task = progress.add_task(f"Індексація корпусу з {source}...", total=None)
-        index = build_index(source, limit=limit)
+        task = progress.add_task(
+            f"Індексація корпусу з {source} ({executor}, воркерів: {workers})...",
+            total=None,
+        )
+        try:
+            index, merge_time = build_index_parallel(
+                source, workers=workers, executor=executor, limit=limit
+            )
+        except Exception as exc:
+            err_console.print(f"[red]Помилка під час індексації:[/red] {exc}")
+            raise typer.Exit(code=1) from exc
+
         progress.update(task, description="Збереження файлу індексу на диск...")
         save_index(index, out, fmt=fmt)
 
@@ -92,13 +111,15 @@ def index_command(
 
     stats_text = (
         f"[green]Індексацію успішно завершено![/green]\n\n"
-        f"• Документів проіндексовано: [bold]{index.num_docs:,}[/bold]\n"
-        f"• Унікальних слів у словнику: [bold]{len(index):,}[/bold]\n"
-        f"• Сумарно токенів:           [bold]{index.total_tokens:,}[/bold]\n"
-        f"• Середня довжина документа: [bold]{index.avg_doc_length:.1f}[/bold] слів\n"
-        f"• Розмір файлу на диску:     [bold]{size_mb:.2f} MB[/bold] ({fmt})\n"
-        f"• Витрачений час:            [bold]{elapsed:.2f} с[/bold]\n"
-        f"• Файл збережено у:          [cyan]{out}[/cyan]"
+        f"• Екзекутор / Воркери:        [bold]{executor}[/bold] ({workers} воркерів)\n"
+        f"• Документів проіндексовано:   [bold]{index.num_docs:,}[/bold]\n"
+        f"• Унікальних слів у словнику:  [bold]{len(index):,}[/bold]\n"
+        f"• Сумарно токенів:             [bold]{index.total_tokens:,}[/bold]\n"
+        f"• Середня довжина документа:   [bold]{index.avg_doc_length:.1f}[/bold] слів\n"
+        f"• Час фази злиття (merge):     [bold]{merge_time:.3f} с[/bold]\n"
+        f"• Загальний час (wall time):   [bold]{elapsed:.2f} с[/bold]\n"
+        f"• Розмір файлу на диску:       [bold]{size_mb:.2f} MB[/bold] ({fmt})\n"
+        f"• Файл збережено у:            [cyan]{out}[/cyan]"
     )
     console.print(Panel(stats_text, title="findex index summary", expand=False))
 

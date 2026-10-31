@@ -3,15 +3,13 @@ import gzip
 import json
 import pickle
 import time
-from collections import Counter, defaultdict
 from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 
-from findex.corpus import iter_documents
 from findex.models import DocMeta, Posting
-from findex.tokenizer import normalize_text, tokenize
+from findex.tokenizer import normalize_text
 
 
 class Index(Mapping[str, list[Posting]]):
@@ -113,35 +111,10 @@ def build_index(source: str | Path, limit: int | None = None) -> Index:
     Будує індекс за один прохід по документах.
     Постінги природно впорядковані за зростанням doc_id.
     """
-    src_path = Path(source)
-    postings: dict[str, list[Posting]] = defaultdict(list)
-    doc_meta: dict[int, DocMeta] = {}
+    from findex.parallel import build_index_parallel
 
-    for doc_id, doc in enumerate(iter_documents(src_path, limit=limit)):
-        term_counts: Counter[str] = Counter()
-        doc_len = 0
-        for token in tokenize(doc.text):
-            term_counts[token] += 1
-            doc_len += 1
-
-        title = (
-            doc.text.split("\n", 1)[0].lstrip("#").strip() if doc.text else doc.doc_id
-        )
-        doc_meta[doc_id] = DocMeta(
-            doc_id=doc_id,
-            source_name=doc.doc_id,
-            title=title[:100],
-            length=doc_len,
-        )
-
-        for term, freq in term_counts.items():
-            postings[term].append(Posting(doc_id=doc_id, term_frequency=freq))
-
-    return Index(
-        postings=dict(postings),
-        doc_meta=doc_meta,
-        corpus_dir=src_path if src_path.is_dir() else src_path.parent,
-    )
+    index, _ = build_index_parallel(source, workers=1, executor="serial", limit=limit)
+    return index
 
 
 def save_index(index: Index, path: str | Path, fmt: str = "pickle") -> None:
