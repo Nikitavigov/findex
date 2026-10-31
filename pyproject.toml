@@ -1,6 +1,6 @@
 [project]
 name = "findex"
-version = "0.5.0"
+version = "0.6.0"
 description = "Пошуковий рушій на чистому Python з типізацією strict, Typer CLI та Rich"
 readme = "README.md"
 authors = [
@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "httpx>=0.28.1",
     "rich>=15.0.0",
     "typer>=0.27.3",
 ]
@@ -26,6 +27,7 @@ dev = [
     "psutil>=7.2.2",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]
@@ -36,6 +38,8 @@ typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]

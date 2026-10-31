@@ -16,6 +16,16 @@ def test_cli_help() -> None:
     assert "index" in result.stdout
     assert "search" in result.stdout
     assert "stats" in result.stdout
+    assert "crawl" in result.stdout
+
+
+def test_cli_crawl_help() -> None:
+    """Перевірка виклику команди findex crawl --help."""
+    result = runner.invoke(app, ["crawl", "--help"])
+    assert result.exit_code == 0
+    assert "seed_url" in result.stdout or "URL" in result.stdout
+    assert "--concurrency" in result.stdout
+    assert "--max-pages" in result.stdout
 
 
 def test_cli_index_and_search(sample_corpus_dir: Path, tmp_path: Path) -> None:

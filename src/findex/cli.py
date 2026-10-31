@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import sys
@@ -11,6 +12,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from findex.crawler import crawl
 from findex.index import load_index, save_index
 from findex.parallel import build_index_parallel
 from findex.ranking import BM25Scorer, TfIdfScorer
@@ -251,6 +253,110 @@ def stats_command(
         table.add_row("Час підрахунку", f"{lazy_res.elapsed_sec:.3f} с")
         table.add_row("Пікове споживання RAM", f"{lazy_res.peak_memory_mb:.2f} MB")
         console.print(table)
+
+
+@app.command(name="crawl")
+def crawl_command(
+    seed_url: Annotated[str, typer.Argument(help="Початкова адреса URL для обходу.")],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Шлях до файлу JSONL для збереження сторінок."),
+    ] = Path("data/crawl.jsonl"),
+    max_pages: Annotated[
+        int,
+        typer.Option("--max-pages", "-m", help="Максимальна кількість сторінок для завантаження."),
+    ] = 100,
+    concurrency: Annotated[
+        int,
+        typer.Option("--concurrency", "-c", help="Кількість одночасних запитів (семафор)."),
+    ] = 10,
+    per_host: Annotated[
+        int,
+        typer.Option("--per-host", "-p", help="Максимальна кількість одночасних запитів до хоста."),
+    ] = 2,
+    delay: Annotated[
+        float,
+        typer.Option("--delay", "-d", help="Мінімальна пауза між запитами до одного хоста (секунди)."),
+    ] = 0.1,
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Таймаут завантаження сторінки (секунди)."),
+    ] = 10.0,
+    log_file: Annotated[
+        Path,
+        typer.Option("--log", "-l", help="Шлях до файлу логу статусів crawl.log."),
+    ] = Path("crawl.log"),
+) -> None:
+    """Асинхронний обхід веб-сторінок через asyncio та потоковий запис у JSONL."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    errors_count = 0
+    total_bytes = 0
+    pages_count = 0
+
+    with open(log_file, "a", encoding="utf-8") as log_handle, open(out, "w", encoding="utf-8") as jsonl_handle:
+        def on_log(url: str, status: int, nbytes: int, elapsed: float, err: str | None) -> None:
+            nonlocal errors_count, total_bytes
+            total_bytes += nbytes
+            if status >= 400 or err:
+                errors_count += 1
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            status_str = f"{status}" if not err else f"{status} ({err})"
+            log_handle.write(f"[{ts}] {status_str} {url} {nbytes}B {elapsed:.2f}s\n")
+            log_handle.flush()
+
+        async def run_crawler() -> None:
+            nonlocal pages_count
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=err_console,
+            ) as progress:
+                task = progress.add_task(
+                    f"Обхід {seed_url} (ліміт: {max_pages} сторінок)...", total=max_pages
+                )
+                async for page in crawl(
+                    seed_url,
+                    max_pages=max_pages,
+                    concurrency=concurrency,
+                    per_host=per_host,
+                    per_host_delay=delay,
+                    timeout=timeout,
+                    log_callback=on_log,
+                ):
+                    pages_count += 1
+                    row = {
+                        "id": page.url,
+                        "url": page.url,
+                        "title": page.title,
+                        "text": page.text,
+                        "fetched_at": page.fetched_at,
+                    }
+                    jsonl_handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    jsonl_handle.flush()
+                    progress.update(
+                        task,
+                        completed=pages_count,
+                        description=f"Зібрано {pages_count}/{max_pages} сторінок...",
+                    )
+
+        t0 = time.perf_counter()
+        asyncio.run(run_crawler())
+        elapsed = time.perf_counter() - t0
+
+    rate = pages_count / elapsed if elapsed > 0 else 0.0
+    summary_text = (
+        f"[green]Асинхронний обхід успішно завершено![/green]\n\n"
+        f"• Зібрано сторінок:        [bold]{pages_count:,}[/bold] / {max_pages:,}\n"
+        f"• Швидкість:              [bold]{rate:.1f}[/bold] стор./сек\n"
+        f"• Загальний час:          [bold]{elapsed:.2f} с[/bold]\n"
+        f"• Завантажено даних:      [bold]{total_bytes / (1024*1024):.2f} MB[/bold]\n"
+        f"• Помилок / блокувань:    [bold]{errors_count}[/bold]\n"
+        f"• Результат збережено у:  [cyan]{out}[/cyan]\n"
+        f"• Журнал запитів:         [cyan]{log_file}[/cyan]"
+    )
+    console.print(Panel(summary_text, title="findex crawl summary", expand=False))
 
 
 if __name__ == "__main__":
