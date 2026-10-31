@@ -1,12 +1,14 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
+import uvicorn
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -357,6 +359,55 @@ def crawl_command(
         f"• Журнал запитів:         [cyan]{log_file}[/cyan]"
     )
     console.print(Panel(summary_text, title="findex crawl summary", expand=False))
+
+
+@app.command(name="serve")
+def serve_command(
+    index_path: Annotated[
+        Path,
+        typer.Option("--index-path", "-i", help="Шлях до файлу індексу для завантаження."),
+    ] = Path("data/index.bin"),
+    host: Annotated[
+        str,
+        typer.Option("--host", "-h", help="Мережевий хост для прослуховування."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option("--port", "-p", help="Мережевий порт."),
+    ] = 8000,
+    workers: Annotated[
+        int,
+        typer.Option("--workers", "-w", help="Кількість робочих процесів uvicorn."),
+    ] = 1,
+    reload: Annotated[
+        bool,
+        typer.Option("--reload", "-r", help="Автоматичне перезавантаження при зміні коду."),
+    ] = False,
+) -> None:
+    """Запустити веб-сервер пошуку findex (FastAPI + Uvicorn)."""
+    os.environ["INDEX_PATH"] = str(index_path)
+
+    console.print(
+        Panel(
+            f"[green]Запуск веб-сервісу findex...[/green]\n\n"
+            f"• Адреса:        [bold cyan]http://{host}:{port}[/bold cyan]\n"
+            f"• Swagger API:   [bold cyan]http://{host}:{port}/docs[/bold cyan]\n"
+            f"• Файл індексу:  [cyan]{index_path}[/cyan]\n"
+            f"• Воркерів:      [bold]{workers}[/bold]\n"
+            f"• Auto-reload:   [bold]{reload}[/bold]",
+            title="findex serve",
+            expand=False,
+        )
+    )
+
+    uvicorn.run(
+        "findex.web.app:app",
+        host=host,
+        port=port,
+        workers=workers if not reload else 1,
+        reload=reload,
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":

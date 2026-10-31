@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if query %}{{ query }} — Пошук findex{% else %}findex — Повнотекстовий пошуковий рушій{% endif %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="brand-logo">findex</a>
+      <nav class="nav-links">
+        <a href="/docs" target="_blank" rel="noopener">Swagger API</a>
+        <a href="/stats" target="_blank" rel="noopener">Статистика JSON</a>
+        <a href="/health" target="_blank" rel="noopener">Health</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <section class="search-section">
+      <form action="/" method="GET" class="search-form">
+        <div class="search-input-wrap">
+          <input
+            type="search"
+            name="q"
+            value="{{ query }}"
+            placeholder="Введіть пошуковий запит (наприклад, python async crawler)..."
+            required
+            minlength="1"
+            maxlength="200"
+            autofocus
+            class="search-input"
+          >
+          <button type="submit" class="search-button">Знайти</button>
+        </div>
+
+        <div class="search-options">
+          <label class="option-label">
+            Скорер:
+            <select name="scorer" class="select-control">
+              <option value="bm25" {% if scorer == 'bm25' %}selected{% endif %}>BM25</option>
+              <option value="tfidf" {% if scorer == 'tfidf' %}selected{% endif %}>TF-IDF</option>
+            </select>
+          </label>
+
+          <label class="option-label">
+            На сторінку:
+            <select name="k" class="select-control">
+              <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+              <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
+              <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+            </select>
+          </label>
+        </div>
+      </form>
+    </section>
+
+    {% if query %}
+      <section class="results-meta">
+        <div class="meta-info">
+          Знайдено <strong>{{ total }}</strong> результатів за <strong>{{ "%.2f"|format(elapsed_ms) }}</strong> мс
+          (сторінка {{ page }} з {{ total_pages }})
+        </div>
+      </section>
+
+      {% if results %}
+        <section class="results-list">
+          {% for r in results %}
+            <article class="result-card">
+              <div class="result-header">
+                <h2 class="result-title">
+                  <a href="/view/{{ r.doc_id }}">{{ r.title }}</a>
+                </h2>
+                <span class="score-badge" title="Релевантність {{ scorer|upper }}">{{ scorer|upper }}: {{ "%.4f"|format(r.score) }}</span>
+              </div>
+              <div class="result-url">
+                <span class="doc-badge">#{{ r.doc_id }}</span>
+                {% if r.url %}
+                  <a href="{{ r.url }}" target="_blank" rel="noopener" class="source-link">{{ r.url }}</a>
+                {% endif %}
+              </div>
+              <p class="result-snippet">{{ r.snippet | safe }}</p>
+            </article>
+          {% endfor %}
+        </section>
+
+        {% if total_pages > 1 %}
+          <nav class="pagination" aria-label="Пагінація результатів">
+            {% if page > 1 %}
+              <a href="/?q={{ query }}&page={{ page - 1 }}&k={{ page_size }}&scorer={{ scorer }}" class="page-link prev-link">← Попередня</a>
+            {% endif %}
+
+            <span class="page-current">Сторінка {{ page }} з {{ total_pages }}</span>
+
+            {% if page < total_pages %}
+              <a href="/?q={{ query }}&page={{ page + 1 }}&k={{ page_size }}&scorer={{ scorer }}" class="page-link next-link">Наступна →</a>
+            {% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <p>За запитом <strong>«{{ query }}»</strong> нічого не знайдено.</p>
+          <p class="empty-hint">Спробуйте скоротити запит або змінити ключові слова.</p>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="welcome-card">
+        <h2>Повнотекстовий рушій пошуку findex</h2>
+        <p>Введіть запит для ранжованого пошуку за алгоритмами <strong>BM25</strong> або <strong>TF-IDF</strong>.</p>
+        <div class="quick-queries">
+          <span>Спробуйте:</span>
+          <a href="/?q=python" class="query-chip">python</a>
+          <a href="/?q=crawler" class="query-chip">crawler</a>
+          <a href="/?q=asyncio" class="query-chip">asyncio</a>
+          <a href="/?q=index" class="query-chip">index</a>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>findex v0.7.0 • Лабораторна робота 7</span>
+      <span>НАУ / КАІ • Б-126-23-1-ІТ</span>
+    </div>
+  </footer>
+</body>
+</html>

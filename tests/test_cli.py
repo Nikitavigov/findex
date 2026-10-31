@@ -19,6 +19,7 @@ def test_cli_help() -> None:
     assert "search" in clean_out
     assert "stats" in clean_out
     assert "crawl" in clean_out
+    assert "serve" in clean_out
 
 
 def test_cli_crawl_help() -> None:
@@ -29,6 +30,16 @@ def test_cli_crawl_help() -> None:
     assert "seed_url" in clean_out or "URL" in clean_out
     assert "--concurrency" in clean_out
     assert "--max-pages" in clean_out
+
+
+def test_cli_serve_help() -> None:
+    """Перевірка виклику команди findex serve --help."""
+    result = runner.invoke(app, ["serve", "--help"])
+    assert result.exit_code == 0
+    clean_out = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", result.stdout)
+    assert "--port" in clean_out
+    assert "--host" in clean_out
+    assert "--workers" in clean_out
 
 
 def test_cli_index_and_search(sample_corpus_dir: Path, tmp_path: Path) -> None:

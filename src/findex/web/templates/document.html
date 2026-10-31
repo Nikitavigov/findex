@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ doc.title }} — findex</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="brand-logo">findex</a>
+      <nav class="nav-links">
+        <a href="javascript:history.back()" class="back-link">← Назад до результатів</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <article class="doc-viewer-card">
+      <div class="doc-viewer-header">
+        <span class="doc-badge">Документ #{{ doc.doc_id }}</span>
+        <h1 class="doc-viewer-title">{{ doc.title }}</h1>
+        <div class="doc-viewer-meta">
+          <span>Токенів: <strong>{{ doc.length }}</strong></span>
+          {% if doc.url %}
+            <span>URL: <a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.url }}</a></span>
+          {% endif %}
+        </div>
+      </div>
+
+      <hr class="doc-divider">
+
+      <div class="doc-viewer-body">
+        <pre class="doc-text-content">{{ doc.text }}</pre>
+      </div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>findex v0.7.0 • Перегляд документа</span>
+      <span>НАУ / КАІ</span>
+    </div>
+  </footer>
+</body>
+</html>

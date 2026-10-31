@@ -1,16 +1,22 @@
 [project]
 name = "findex"
-version = "0.6.0"
-description = "Пошуковий рушій на чистому Python з типізацією strict, Typer CLI та Rich"
+version = "0.7.0"
+description = "Пошуковий рушій на чистому Python з FastAPI, Pydantic, Web UI та Typer CLI"
 readme = "README.md"
 authors = [
     { name = "Nikitavigov", email = "nikitavigov06@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.115.0",
     "httpx>=0.28.1",
+    "jinja2>=3.1.4",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-multipart>=0.0.12",
     "rich>=15.0.0",
     "typer>=0.27.3",
+    "uvicorn[standard]>=0.32.0",
 ]
 
 [project.scripts]
