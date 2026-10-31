@@ -4,7 +4,7 @@ import json
 import pickle
 import time
 from collections import Counter, defaultdict
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
@@ -38,6 +38,11 @@ class Index(Mapping[str, list[Posting]]):
     def total_docs(self) -> int:
         """Псевдонім для num_docs для сумісності з попередніми лабами."""
         return len(self.doc_meta)
+
+    @property
+    def postings(self) -> dict[str, list[Posting]]:
+        """Словник термів та відповідних списків постінгів."""
+        return self._postings
 
     @property
     def total_tokens(self) -> int:
@@ -150,7 +155,7 @@ def save_index(index: Index, path: str | Path, fmt: str = "pickle") -> None:
 
     if fmt == "pickle":
         data = {
-            "postings": index._postings,
+            "postings": index.postings,
             "doc_meta": index.doc_meta,
             "corpus_dir": str(index.corpus_dir) if index.corpus_dir else None,
         }
@@ -171,7 +176,7 @@ def save_index(index: Index, path: str | Path, fmt: str = "pickle") -> None:
             },
             "postings": {
                 term: [[p.doc_id, p.term_frequency] for p in plist]
-                for term, plist in index._postings.items()
+                for term, plist in index.postings.items()
             },
         }
         opener = gzip.open if fmt == "json.gz" or out_path.suffix == ".gz" else open
@@ -234,7 +239,7 @@ def load_index(path: str | Path, fmt: str | None = None) -> Index:
 
 
 @contextmanager
-def open_index(path: str | Path, fmt: str | None = None) -> Iterator[Index]:
+def open_index(path: str | Path, fmt: str | None = None) -> Generator[Index, None, None]:
     """
     Контекстний менеджер для безпечного завантаження та роботи з індексом.
     Гарантує завершення ресурсів навіть при виникненні винятків.

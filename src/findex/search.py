@@ -3,7 +3,6 @@ import functools
 import logging
 import time
 from collections.abc import Callable
-from typing import Any
 
 from findex.boolean import (
     merge_and,
@@ -15,25 +14,24 @@ from findex.boolean import (
 )
 from findex.index import Index, load_index
 from findex.models import Posting, SearchResult
-from findex.query import parse_query
+from findex.query import QueryNode, parse_query
 from findex.ranking import BM25Scorer, Scorer, TfIdfScorer, rank_documents
 from findex.snippets import generate_snippet
 from findex.tokenizer import normalize_text, tokenize
 
 logger = logging.getLogger("findex.search")
 
+# --- Декоратор @timed з functools.wraps та збереженням сигнатур типів ---
 
-# --- Декоратор @timed з functools.wraps ---
 
-
-def timed(func: Callable) -> Callable:
+def timed[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     """
     Декоратор для вимірювання часу виконання функцій.
-    Зберігає ім'я, docstring та сигнатуру оригінальної функції через functools.wraps.
+    Зберігає ім'я, docstring та точні типи аргументів і повернення через ParamSpec/TypeVar.
     """
 
     @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         start_time = time.perf_counter()
         result = func(*args, **kwargs)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
@@ -43,21 +41,17 @@ def timed(func: Callable) -> Callable:
     return wrapper
 
 
-# --- Кешування запитів @lru_cache ---
+# --- Кешування синтаксичного дерева запитів @lru_cache ---
 
 
 @functools.lru_cache(maxsize=128)
-def _cached_query_postings(
-    query_str: str, _index_hash: int, index: Index
-) -> tuple[Posting, ...]:
+def _cached_query_ast(query_str: str) -> QueryNode:
     """
-    Кешована версія виконання запиту.
-    При повторному виклику з тим самим запитом повертає результат миттєво з кешу.
+    Кешує розбір запиту в синтаксичне дерево AST.
+    При повторному виклику запит парситься миттєво з кешу.
     """
-    logger.info(f"Cache MISS для запиту: '{query_str}'")
-    ast = parse_query(query_str)
-    postings = ast.evaluate(index)
-    return tuple(postings)
+    logger.info(f"Cache miss для парсингу: '{query_str}'")
+    return parse_query(query_str)
 
 
 # --- Комплексний пошук з ранжуванням та сніпетами ---
@@ -84,7 +78,6 @@ def search_ranked(
     ranked = rank_documents(query_terms, index, scorer, top_k=top_k)
 
     if with_snippets and index.corpus_dir:
-        # Підтягуємо тексти документів для формування сніпетів
         for result in ranked:
             doc_meta = index.doc_meta.get(result.doc_id)
             if not doc_meta:
@@ -106,19 +99,23 @@ def execute_query(query: str, index: Index, engine: str = "merge") -> list[Posti
     Сумісна точка входу для логічних запитів (Boolean search).
     Підтримує 'merge' та 'set'.
     """
-    # Спроба отримати результат через кеш для парсера
     try:
-        postings = list(_cached_query_postings(query, id(index), index))
-        return postings
+        ast = _cached_query_ast(query)
+        return ast.evaluate(index)
     except (ValueError, KeyError, TypeError):
-        # Fallback до базового розбору якщо запит простий
         tokens = query.strip().split()
         if not tokens:
             return []
 
-        and_func = merge_and if engine == "merge" else set_and
-        or_func = merge_or if engine == "merge" else set_or
-        not_func = merge_not if engine == "merge" else set_not
+        and_func: Callable[[list[Posting], list[Posting]], list[Posting]] = (
+            merge_and if engine == "merge" else set_and
+        )
+        or_func: Callable[[list[Posting], list[Posting]], list[Posting]] = (
+            merge_or if engine == "merge" else set_or
+        )
+        not_func: Callable[[list[Posting], list[Posting]], list[Posting]] = (
+            merge_not if engine == "merge" else set_not
+        )
 
         current_results: list[Posting] | None = None
         next_op = "AND"
@@ -157,16 +154,11 @@ def main() -> None:
     parser.add_argument("index_path", type=str, help="Шлях до файлу індексу")
     parser.add_argument("query", type=str, help="Пошуковий запит")
     parser.add_argument(
-        "--scorer",
-        choices=["bm25", "tfidf"],
-        default="bm25",
-        help="Алгоритм ранжування",
+        "--scorer", choices=["bm25", "tfidf"], default="bm25", help="Алгоритм ранжування"
     )
     parser.add_argument("--limit", type=int, default=10, help="Кількість результатів")
     parser.add_argument(
-        "--boolean",
-        action="store_true",
-        help="Виконати чистий логічний пошук без оцінок",
+        "--boolean", action="store_true", help="Виконати чистий логічний пошук без оцінок"
     )
 
     args = parser.parse_args()
@@ -185,16 +177,12 @@ def main() -> None:
         for rank, p in enumerate(postings[: args.limit], start=1):
             meta = index.doc_meta.get(p.doc_id)
             title = meta.title if meta else f"Doc #{p.doc_id}"
-            print(
-                f"  {rank:2d}. [doc_id={p.doc_id}] {title} (частота: {p.term_frequency})"
-            )
+            print(f"  {rank:2d}. [doc_id={p.doc_id}] {title} (частота: {p.term_frequency})")
     else:
         scorer = BM25Scorer() if args.scorer == "bm25" else TfIdfScorer()
         results = search_ranked(args.query, index, scorer, top_k=args.limit)
 
-        print(
-            f"Знайдено документів (Ранжований {args.scorer.upper()}): {len(results):,}"
-        )
+        print(f"Знайдено документів (Ранжований {args.scorer.upper()}): {len(results):,}")
         for rank, r in enumerate(results, start=1):
             print(f"  {rank:2d}. [бал: {r.score:.4f}] {r.title} (doc_id={r.doc_id})")
             if r.snippet:

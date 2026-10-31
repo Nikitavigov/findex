@@ -4,18 +4,22 @@ import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
+
+
+def _empty_metadata() -> dict[str, Any]:
+    return {}
 
 
 @dataclass(slots=True)
 class Document:
     doc_id: str
     text: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=_empty_metadata)
 
 
 def _read_file_text(file_path: Path) -> str:
-    """Read file content with UTF-8 encoding, handling compression if necessary."""
+    """Читати вміст файлу у кодуванні UTF-8, враховуючи можливе стиснення gzip."""
     if file_path.suffix == ".gz":
         with gzip.open(file_path, "rt", encoding="utf-8", errors="replace") as f:
             return f.read()
@@ -24,17 +28,17 @@ def _read_file_text(file_path: Path) -> str:
 
 
 def _iter_jsonl(file_path: Path) -> Iterator[Document]:
-    """Stream documents from a JSON-lines (.jsonl or .jsonl.gz) file."""
+    """Потокове читання документів з файлу JSON-lines (.jsonl або .jsonl.gz)."""
 
-    def _parse_lines(stream) -> Iterator[Document]:
+    def _parse_lines(stream: IO[str]) -> Iterator[Document]:
         for idx, line in enumerate(stream, start=1):
-            line = line.strip()
-            if not line:
+            line_str = line.strip()
+            if not line_str:
                 continue
-            data = json.loads(line)
+            data: dict[str, Any] = json.loads(line_str)
             doc_id = str(data.get("id", data.get("doc_id", idx)))
-            text = data.get("text", data.get("content", data.get("body", "")))
-            meta = {
+            text = str(data.get("text", data.get("content", data.get("body", ""))))
+            meta: dict[str, Any] = {
                 k: v
                 for k, v in data.items()
                 if k not in {"id", "doc_id", "text", "content", "body"}
@@ -50,7 +54,7 @@ def _iter_jsonl(file_path: Path) -> Iterator[Document]:
 
 
 def _iter_directory(dir_path: Path) -> Iterator[Document]:
-    """Stream text files from directory recursively without loading everything into memory."""
+    """Рекурсивне потокове читання текстових файлів з каталогу."""
     for path in dir_path.rglob("*"):
         if not path.is_file():
             continue
@@ -73,12 +77,12 @@ def _iter_directory(dir_path: Path) -> Iterator[Document]:
 
 def iter_documents(source: str | Path, limit: int | None = None) -> Iterator[Document]:
     """
-    Lazy generator that yields Document instances one by one.
-    Does not load the corpus into memory.
+    Лінивий генератор, що повертає екземпляри Document по одному.
+    Не завантажує весь корпус в оперативну пам'ять.
     """
     path = Path(source)
     if not path.exists():
-        raise FileNotFoundError(f"Corpus path not found: {path}")
+        raise FileNotFoundError(f"Шлях до корпусу не знайдено: {path}")
 
     def _generator() -> Iterator[Document]:
         if path.is_file():

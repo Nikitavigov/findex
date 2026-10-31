@@ -1,4 +1,5 @@
 from array import array
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 
@@ -53,8 +54,9 @@ class PlainPosting:
 # Компактне представлення списку постінгів через масив цілих чисел array('I')
 class ArrayPostings:
     __slots__ = ("_data",)
+    _data: array[int]
 
-    def __init__(self, data: array | None = None) -> None:
+    def __init__(self, data: array[int] | None = None) -> None:
         self._data = data if data is not None else array("I")
 
     def append(self, doc_id: int, term_frequency: int) -> None:
@@ -64,6 +66,6 @@ class ArrayPostings:
     def __len__(self) -> int:
         return len(self._data) // 2
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Posting]:
         for i in range(0, len(self._data), 2):
             yield Posting(self._data[i], self._data[i + 1])

@@ -2,6 +2,195 @@
 
 Курс «Програмування на Python» (НАУ / КАІ, група Б-126-23-1-ІТ).
 
+[![CI](https://github.com/Nikitavigov/findex/actions/workflows/ci.yml/badge.svg)](https://github.com/Nikitavigov/findex/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/Nikitavigov/findex/releases/tag/v0.4.0)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Typing](https://img.shields.io/badge/pyright-strict-green.svg)](https://github.com/microsoft/pyright)
+[![Coverage](https://img.shields.io/badge/coverage-78%25-brightgreen.svg)](https://github.com/Nikitavigov/findex)
+
+---
+
+## Лабораторна робота №4. Типізація, тестування, пакування та CLI
+
+### 1. Опис та виконані завдання
+
+У четвертій лабораторній роботі проєкт оформлено як повноцінний сучасний пакет Python за стандартом PEP 621, впроваджено сувору статичну типізацію (Pyright strict), розширено тестову базу перевіркою інваріантів (Hypothesis) та створено інтерфейс командного рядка (CLI) на базі Typer і Rich:
+
+1. **Пакування за стандартами PEP 517/518/621 (`pyproject.toml`):**
+   - Описано метадані проєкту, версію `0.4.0`, залежності та точки входу `[project.scripts]`.
+   - Збірка дистрибутивів wheel (`.whl`) та source distribution (`.tar.gz`) через інструмент `uv build` та бекенд `hatchling`.
+   - Консольна точка входу `findex`: запуск утиліти як встановленої команди системи.
+
+2. **Сувора статична типізація (Pyright strict mode):**
+   - Налаштовано суворий режим перевірки типів у `pyproject.toml` (`typeCheckingMode = "strict"`).
+   - Повністю усунено неявні `Any`, відсутні аргументи утилітарних типів і небезпечні звернення (`0 errors, 0 warnings`).
+   - Декоратор `@timed` типізовано з використанням сучасного синтаксису параметрів типів PEP 695: `def timed[**P, R](func: Callable[P, R]) -> Callable[P, R]`, що гарантує збереження типів параметрів і результату.
+   - Контекстні менеджери анотовано через `Generator[T, None, None]`, що відповідає сучасним вимогам типізації замість застарілого `Iterator[T]`.
+
+3. **Інтерфейс командного рядка (CLI) на Typer та Rich:**
+   - Реалізовано три головні підкоманди:
+     - `findex index <corpus_dir> --out <path> [--format pickle|json]` — побудова та збереження індексу з відображенням анімованого прогрес-бару Rich та зведеної панелі метрик.
+     - `findex search <index_path> "<query>" [--scorer bm25|tfidf] [--limit 10] [--json]` — ранжований пошук із форматуванням результатів у стилізовану таблицю Rich або чистий JSON для конвеєрів (pipes).
+     - `findex stats <corpus_dir> [--compare]` — аналіз обсягу словника, кількості токенів і порівняння витрат оперативної пам'яті (Eager vs Lazy).
+   - Підтримка рівнів логування через прапорець `-v` / `-vv`.
+
+4. **Розширене тестування та перевірка інваріантів (Hypothesis):**
+   - Створено 4 property-based тести на базі бібліотеки `hypothesis`:
+     - *Властивість 1:* еквівалентність двовказівникових алгоритмів злиття (`merge_and`, `merge_or`) та множинних операцій (`set_and`, `set_or`) на довільних згенерованих списках ID.
+     - *Властивість 2:* збереження інваріанта строгого зростання `doc_id` у кожному списку постінгів для довільних текстів.
+     - *Властивість 3:* round-trip незмінність індексу при збереженні та завантаженні у форматах JSON та Pickle.
+     - *Властивість 4:* ідемпотентність нормалізатора тексту (`normalize_text(normalize_text(s)) == normalize_text(s)`).
+   - Створено модульні тести для CLI (`tests/test_cli.py`) з використанням `typer.testing.CliRunner`.
+   - Загальна кількість автоматичних тестів зросла до **46**, успішність проходження **100%**, покриття коду тестами — **78%**.
+
+5. **Неперервна інтеграція (GitHub Actions CI):**
+   - Створено конфігурацію `.github/workflows/ci.yml`.
+   - При кожному пуші автоматично запускаються перевірка стилю (Ruff), перевірка типів (Pyright), тестовий набір (Pytest) та тестова збірка пакетів (uv build).
+
+---
+
+### 2. Звіт про проходження тестів та покриття коду
+
+```text
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-9.2.0, pluggy-1.7.0
+rootdir: findex, configfile: pyproject.toml
+testpaths: tests, plugins: hypothesis-6.170.14, cov-7.1.0
+collected 46 items
+
+tests/test_cli.py::test_cli_help PASSED                                  [  2%]
+tests/test_cli.py::test_cli_index_and_search PASSED                      [  4%]
+tests/test_cli.py::test_cli_search_tfidf PASSED                          [  6%]
+tests/test_cli.py::test_cli_index_nonexistent_path PASSED                [  8%]
+tests/test_cli.py::test_cli_search_nonexistent_index PASSED              [ 10%]
+tests/test_cli.py::test_cli_stats PASSED                                 [ 13%]
+tests/test_cli.py::test_cli_stats_compare PASSED                         [ 15%]
+tests/test_corpus.py::test_iter_documents_is_generator PASSED            [ 17%]
+tests/test_corpus.py::test_iter_documents_limit PASSED                   [ 19%]
+tests/test_corpus.py::test_iter_documents_jsonl PASSED                   [ 21%]
+tests/test_data_model.py::test_index_mapping_protocol PASSED             [ 23%]
+tests/test_data_model.py::test_index_properties PASSED                   [ 26%]
+tests/test_data_model.py::test_open_index_context_manager PASSED         [ 28%]
+tests/test_hypothesis.py::test_property_boolean_merge_equals_set PASSED  [ 30%]
+tests/test_hypothesis.py::test_property_postings_are_strictly_sorted PASSED [ 32%]
+tests/test_hypothesis.py::test_property_index_serialization_roundtrip PASSED [ 34%]
+tests/test_hypothesis.py::test_property_normalization_idempotent PASSED  [ 36%]
+tests/test_index.py::test_posting_dataclass_contract PASSED              [ 39%]
+tests/test_index.py::test_docmeta_dataclass_contract PASSED              [ 41%]
+tests/test_index.py::test_build_index_sorted_postings PASSED             [ 43%]
+tests/test_index.py::test_save_load_pickle PASSED                        [ 45%]
+tests/test_index.py::test_save_load_json PASSED                          [ 47%]
+tests/test_query_parser.py::test_operator_overloading PASSED             [ 50%]
+tests/test_query_parser.py::test_parse_simple_terms PASSED               [ 52%]
+tests/test_query_parser.py::test_parse_explicit_operators PASSED         [ 54%]
+tests/test_query_parser.py::test_parse_phrase PASSED                     [ 56%]
+tests/test_query_parser.py::test_parse_precedence_and_parentheses PASSED [ 58%]
+tests/test_ranking.py::test_sanity_check_1_rare_beats_frequent PASSED    [ 60%]
+tests/test_ranking.py::test_sanity_check_2_term_saturation PASSED        [ 63%]
+tests/test_ranking.py::test_sanity_check_3_length_normalization PASSED   [ 65%]
+tests/test_ranking.py::test_rank_documents_top_k PASSED                  [ 67%]
+tests/test_search.py::test_merge_and PASSED                              [ 69%]
+tests/test_search.py::test_merge_or PASSED                               [ 71%]
+tests/test_search.py::test_merge_not PASSED                              [ 73%]
+tests/test_search.py::test_merge_vs_set_equivalence PASSED               [ 76%]
+tests/test_search.py::test_execute_query PASSED                          [ 78%]
+tests/test_tokenize.py::test_is_generator PASSED                         [ 80%]
+tests/test_tokenize.py::test_basic_latin PASSED                          [ 82%]
+tests/test_tokenize.py::test_ukrainian_text PASSED                       [ 84%]
+tests/test_tokenize.py::test_ukrainian_apostrophes PASSED                [ 86%]
+tests/test_tokenize.py::test_hyphenated_words PASSED                     [ 89%]
+tests/test_tokenize.py::test_casefolding PASSED                          [ 91%]
+tests/test_tokenize.py::test_unicode_nfc_normalization PASSED            [ 93%]
+tests/test_tokenize.py::test_alphanumerics_and_digits PASSED             [ 95%]
+tests/test_tokenize.py::test_empty_and_punctuation_only PASSED           [ 97%]
+tests/test_tokenize.py::test_streaming_consumption PASSED                [100%]
+
+Name                      Stmts   Miss  Cover
+---------------------------------------------
+src/findex/__init__.py       10      0   100%
+src/findex/boolean.py        89      4    96%
+src/findex/cli.py           105     10    90%
+src/findex/corpus.py         65     12    82%
+src/findex/index.py         129     19    85%
+src/findex/models.py         39      7    82%
+src/findex/query.py         152     17    89%
+src/findex/ranking.py        46      5    89%
+src/findex/search.py        110     62    44%
+src/findex/snippets.py       34     12    65%
+src/findex/stats.py          95     44    54%
+src/findex/tokenizer.py      10      0   100%
+---------------------------------------------
+TOTAL                       884    192    78%
+============================= 46 passed in 17.23s =============================
+```
+
+---
+
+### 3. Приклади використання CLI
+
+```bash
+# Довідка утиліти
+findex --help
+
+# Побудова індексу корпусу
+findex index data/corpus --out data/index.bin --format pickle
+
+# Пошук ранжованих документів через BM25
+findex search data/index.bin "captain AND sea" --scorer bm25 --limit 5
+
+# Пошук із виведенням у JSON (зручно для передачі через pipe в jq або інші інструменти)
+findex search data/index.bin "frankenstein monster" --json
+
+# Порівняльний аналіз пам'яті корпусу (Eager vs Lazy)
+findex stats data/corpus --compare
+```
+
+---
+
+### 4. Відповіді на контрольні запитання (Лабораторна робота №4)
+
+1. **У чому полягає різниця між статичною перевіркою типів (Pyright / Mypy) та runtime-валідацією (Pydantic / typeguard)?**
+   - Статичні аналізатори (Pyright, Mypy) аналізують синтаксичне дерево та типи до запуску програми. Вони не створюють жодних накладних витрат у пам'яті чи процесорному часі під час роботи застосунку, але не захищають від некоректних даних, отриманих ззовні (файли, мережа, ввід користувача).
+   - Інструменти валідації часу виконання (Pydantic) перевіряють типи, перетворюють та очищують значення безпосередньо в момент виконання. Вони витрачають процесорний час, проте гарантують коректність структури зовнішніх даних на кордонах системи.
+
+2. **Що контролює режим `strict` у Pyright? Які типові дефекти він запобігає?**
+   - Режим `strict` забороняє неявне приведення до типу `Any` або невідомих типів (`Unknown`), вимагає повної типізації всіх параметрів і результатів функцій, а також забороняє небезпечні операції (наприклад, індексацію опціональних значень `None`, використання невизначених типів у дженериках `dict` чи `array`). Це усуває ситуації, коли помилка `AttributeError` чи `TypeError` маскується динамічною природою мови до виконання коду в продакшені.
+
+3. **Як типізувати декоратор, щоб зберегти сигнатуру вихідної функції (аргументи та значення повернення)?**
+   - До Python 3.12 використовувались конструкції `typing.ParamSpec` для опису параметрів та `typing.TypeVar` для типу повернення:
+     ```python
+     P = ParamSpec("P")
+     R = TypeVar("R")
+     def decorator(func: Callable[P, R]) -> Callable[P, R]: ...
+     ```
+   - Починаючи з Python 3.12 (PEP 695), це описується набагато компактніше за допомогою параметрів типів:
+     ```python
+     def decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+         @functools.wraps(func)
+         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+             return func(*args, **kwargs)
+         return wrapper
+     ```
+
+4. **Чому для `@contextmanager` правильним типом повернення є `Generator[T, None, None]`, а не `Iterator[T]`?**
+   - Тип `Iterator[T]` описує лише протокол ітерації через метод `__next__()`.
+   - Менеджер контексту працює як повноцінний генератор: він не лише віддає значення `T` через вираз `yield`, але й приймає винятки через генераторний метод `.throw()`, якщо виняток виник усередині блоку `with`. Сучасні тайпчекери вимагають вказувати повну сигнатуру `Generator[YieldType, SendType, ReturnType]`.
+
+5. **Що таке Property-based testing (Hypothesis) і в чому його перевага над звичайними тестами?**
+   - Звичайні юніт-тести перевіряють роботу функції на фіксованих вхідних прикладах, які обрав автор тесту. Через це легко пропустити крайові випадки (порожні рядки, нерозривні пробіли, від'ємні числа, переповнення списків).
+   - Property-based тестування формулює властивість (інваріант), яка має бути істинною для будь-яких валідних даних. Бібліотека самостійно генерує сотні складних, випадкових та межових випадків, намагаючись знайти контрприклад, який зламає інваріант.
+
+6. **Як працює механізм Shrinking у бібліотеці Hypothesis?**
+   - Коли Hypothesis знаходить вхідні дані, на яких тест падає (наприклад, рядок із 500 випадкових символів або список зі 100 чисел), бібліотека запускає алгоритм редукції (shrinking). Вона послідовно зменшує довжину, замінює складні символи простими й видаляє зайві елементи, поки тест усе ще завершується помилкою. У результаті розробник отримує мінімальний і зрозумілий контрприклад (наприклад, один символ пробілу або `[-1]`).
+
+7. **Які переваги надає пакування за стандартом PEP 621 (`pyproject.toml`) порівняно зі застарілими `setup.py` / `requirements.txt`?**
+   - `pyproject.toml` надає єдиний декларативний формат для всього життєвого циклу проєкту: метадані, залежності, конфігурація збирача (hatchling, setuptools, flit), а також налаштування лінтерів, типізаторів і тестів (ruff, pyright, pytest) в одному місці.
+   - Замість виконання довільного коду Python під час інсталяції (`setup.py`), що несло ризики безпеки та призводило до непередбачуваної поведінки середовища, декларативні метадані читаються статично й швидко.
+
+8. **Чому формат Wheel (`.whl`) є швидшим і безпечнішим при розгортанні, ніж вихідний архів Source Distribution (`.tar.gz`)?**
+   - Wheel є готовим зібраним архівом стандартизованого формату (built distribution). Для встановлення пакета менеджеру достатньо просто розпакувати його файли у відповідну папку `site-packages` та створити скрипти обгортки.
+   - Source distribution містить лише вихідний код і вимагає запуску етапу збірки (build step) на кожній машині клієнта, що збільшує час встановлення та створює залежність від додаткових системних інструментів.
+
 ---
 
 ## Лабораторна робота №3. Рейтинг і модель об'єктів: dunder-методи, протоколи, декоратори

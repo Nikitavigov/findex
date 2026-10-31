@@ -1,0 +1,236 @@
+import json
+import logging
+import sys
+import time
+from pathlib import Path
+from typing import Annotated, Literal
+
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+
+from findex.index import build_index, load_index, save_index
+from findex.ranking import BM25Scorer, TfIdfScorer
+from findex.search import search_ranked
+from findex.stats import run_eager, run_lazy
+
+app = typer.Typer(
+    name="findex",
+    help="findex — повнотекстовий пошуковий рушій на Python з типізацією strict та Rich CLI.",
+    no_args_is_help=True,
+)
+
+console = Console()
+err_console = Console(stderr=True)
+
+
+def setup_logging(verbose: int) -> None:
+    """Налаштовує логування в stderr залежно від кількості прапорців -v."""
+    if verbose >= 2:
+        level = logging.DEBUG
+        fmt = "[DEBUG] %(name)s: %(message)s"
+    elif verbose == 1:
+        level = logging.INFO
+        fmt = "[INFO] %(message)s"
+    else:
+        level = logging.WARNING
+        fmt = "%(levelname)s: %(message)s"
+
+    logging.basicConfig(level=level, format=fmt, stream=sys.stderr, force=True)
+
+
+@app.callback()
+def main_callback(
+    verbose: Annotated[
+        int,
+        typer.Option(
+            "-v",
+            "--verbose",
+            count=True,
+            help="Рівень деталізації логів (-v для INFO, -vv для DEBUG).",
+        ),
+    ] = 0,
+) -> None:
+    setup_logging(verbose)
+
+
+@app.command(name="index")
+def index_command(
+    source: Annotated[Path, typer.Argument(help="Каталог або файл корпусу для індексації.")],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Шлях для збереження файлу індексу.")] = Path(
+        "index.bin"
+    ),
+    fmt: Annotated[
+        Literal["pickle", "json"],
+        typer.Option("--format", "-f", help="Формат збереження індексу (pickle або json)."),
+    ] = "pickle",
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Максимальна кількість документів для обробки."),
+    ] = None,
+) -> None:
+    """Побудувати інвертований індекс для заданого корпусу текстів."""
+    if not source.exists():
+        err_console.print(f"[red]Помилка:[/red] Шлях до корпусу '{source}' не існує.")
+        raise typer.Exit(code=1)
+
+    t0 = time.perf_counter()
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=err_console,
+    ) as progress:
+        task = progress.add_task(f"Індексація корпусу з {source}...", total=None)
+        index = build_index(source, limit=limit)
+        progress.update(task, description="Збереження файлу індексу на диск...")
+        save_index(index, out, fmt=fmt)
+
+    elapsed = time.perf_counter() - t0
+    size_mb = out.stat().st_size / (1024 * 1024)
+
+    stats_text = (
+        f"[green]Індексацію успішно завершено![/green]\n\n"
+        f"• Документів проіндексовано: [bold]{index.num_docs:,}[/bold]\n"
+        f"• Унікальних слів у словнику: [bold]{len(index):,}[/bold]\n"
+        f"• Сумарно токенів:           [bold]{index.total_tokens:,}[/bold]\n"
+        f"• Середня довжина документа: [bold]{index.avg_doc_length:.1f}[/bold] слів\n"
+        f"• Розмір файлу на диску:     [bold]{size_mb:.2f} MB[/bold] ({fmt})\n"
+        f"• Витрачений час:            [bold]{elapsed:.2f} с[/bold]\n"
+        f"• Файл збережено у:          [cyan]{out}[/cyan]"
+    )
+    console.print(Panel(stats_text, title="findex index summary", expand=False))
+
+
+@app.command(name="search")
+def search_command(
+    index_path: Annotated[Path, typer.Argument(help="Шлях до файлу збереженого індексу.")],
+    query: Annotated[str, typer.Argument(help="Пошуковий запит.")],
+    scorer_name: Annotated[
+        Literal["bm25", "tfidf"],
+        typer.Option("--scorer", "-s", help="Алгоритм оцінки релевантності (bm25 або tfidf)."),
+    ] = "bm25",
+    limit: Annotated[
+        int,
+        typer.Option("--limit", "-k", help="Кількість найрелевантніших результатів."),
+    ] = 10,
+    as_json: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Вивести результати у чистому форматі JSON для конвеєрів (pipes).",
+        ),
+    ] = False,
+) -> None:
+    """Виконати повнотекстовий ранжований пошук за запитом."""
+    if not index_path.exists():
+        err_console.print(f"[red]Помилка:[/red] Файл індексу '{index_path}' не знайдено.")
+        raise typer.Exit(code=1)
+
+    try:
+        index = load_index(index_path)
+    except Exception as exc:
+        err_console.print(f"[red]Помилка завантаження індексу:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    scorer = BM25Scorer() if scorer_name == "bm25" else TfIdfScorer()
+    t0 = time.perf_counter()
+    results = search_ranked(query, index, scorer=scorer, top_k=limit)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    if as_json:
+        output_data = [
+            {
+                "rank": rank,
+                "score": round(r.score, 4),
+                "doc_id": r.doc_id,
+                "title": r.title,
+                "source": r.source_name,
+                "snippet": r.snippet,
+            }
+            for rank, r in enumerate(results, start=1)
+        ]
+        print(json.dumps(output_data, ensure_ascii=False, indent=2))
+        return
+
+    table = Table(
+        title=f"Результати пошуку: '{query}' (Скорер: {scorer_name.upper()}, час: {elapsed_ms:.2f} мс)",
+        show_lines=True,
+    )
+    table.add_column("№", style="cyan", width=4, justify="right")
+    table.add_column("Бал", style="green", width=10, justify="right")
+    table.add_column("ID", style="dim", width=6, justify="right")
+    table.add_column("Назва документа / Джерело", style="bold", width=35)
+    table.add_column("Знайдений фрагмент (сніпет)", style="white")
+
+    for rank, r in enumerate(results, start=1):
+        doc_label = f"{r.title}\n[dim]{r.source_name}[/dim]" if r.source_name else r.title
+        table.add_row(
+            str(rank),
+            f"{r.score:.4f}",
+            str(r.doc_id),
+            doc_label,
+            r.snippet or "[italic dim]сніпет недоступний[/italic dim]",
+        )
+
+    console.print(table)
+
+
+@app.command(name="stats")
+def stats_command(
+    source: Annotated[Path, typer.Argument(help="Каталог або файл корпусу.")],
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", "-l", help="Максимальна кількість документів."),
+    ] = None,
+    compare: Annotated[
+        bool,
+        typer.Option("--compare", "-c", help="Порівняти лінивий та жадібний режими."),
+    ] = False,
+) -> None:
+    """Показати статистику корпусу або порівняти використання пам'яті (Eager vs Lazy)."""
+    if not source.exists():
+        err_console.print(f"[red]Помилка:[/red] Шлях '{source}' не існує.")
+        raise typer.Exit(code=1)
+
+    lazy_res = run_lazy(source, limit=limit)
+
+    if compare:
+        eager_res = run_eager(source, limit=limit)
+        table = Table(title="Порівняння ефективності використання пам'яті (Eager vs Lazy)")
+        table.add_column("Метрика", style="bold")
+        table.add_column("Жадібний (Eager: списки)", style="red", justify="right")
+        table.add_column("Лінивий (Lazy: генератори)", style="green", justify="right")
+
+        table.add_row("Документів", f"{eager_res.doc_count:,}", f"{lazy_res.doc_count:,}")
+        table.add_row("Всього токенів", f"{eager_res.token_count:,}", f"{lazy_res.token_count:,}")
+        table.add_row("Розмір словника", f"{eager_res.vocab_size:,}", f"{lazy_res.vocab_size:,}")
+        table.add_row("Час виконання", f"{eager_res.elapsed_sec:.3f} с", f"{lazy_res.elapsed_sec:.3f} с")
+        table.add_row(
+            "Пікова пам'ять (RAM)",
+            f"{eager_res.peak_memory_mb:.2f} MB",
+            f"{lazy_res.peak_memory_mb:.2f} MB",
+        )
+
+        console.print(table)
+        savings = (
+            ((eager_res.peak_memory_mb - lazy_res.peak_memory_mb) / eager_res.peak_memory_mb) * 100
+            if eager_res.peak_memory_mb
+            else 0
+        )
+        console.print(f"\n[bold green]Заощаджено пам'яті за допомогою генераторів:[/bold green] [bold]{savings:.1f}%[/bold]\n")
+    else:
+        table = Table(title=f"Статистика корпусу: {source}")
+        table.add_column("Параметр", style="bold")
+        table.add_column("Значення", style="cyan", justify="right")
+        table.add_row("Оброблено документів", f"{lazy_res.doc_count:,}")
+        table.add_row("Загальна кількість токенів", f"{lazy_res.token_count:,}")
+        table.add_row("Унікальних слів (словник)", f"{lazy_res.vocab_size:,}")
+        table.add_row("Час підрахунку", f"{lazy_res.elapsed_sec:.3f} с")
+        table.add_row("Пікове споживання RAM", f"{lazy_res.peak_memory_mb:.2f} MB")
+        console.print(table)
+
+
+if __name__ == "__main__":
+    app()

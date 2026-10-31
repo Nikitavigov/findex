@@ -121,7 +121,7 @@ TOKEN_REGEX = re.compile(
 
 def _tokenize_query(query_str: str) -> list[tuple[str, str]]:
     """Розбиває рядок запиту на список токенів (тип, значення)."""
-    tokens = []
+    tokens: list[tuple[str, str]] = []
     for match in TOKEN_REGEX.finditer(query_str):
         kind = match.lastgroup
         value = match.group(0)
@@ -172,13 +172,14 @@ class QueryParser:
 
     def parse(self) -> QueryNode:
         node = self.parse_or()
-        if self.peek() is not None:
-            raise ValueError(f"Зайвий символ у запиті: {self.peek()[1]}")
+        tok = self.peek()
+        if tok is not None:
+            raise ValueError(f"Зайвий символ у запиті: {tok[1]}")
         return node
 
     def parse_or(self) -> QueryNode:
         left = self.parse_and()
-        while self.peek() and self.peek()[0] == "OR":
+        while (tok := self.peek()) is not None and tok[0] == "OR":
             self.consume("OR")
             right = self.parse_and()
             left = Or(left, right)
@@ -186,15 +187,15 @@ class QueryParser:
 
     def parse_and(self) -> QueryNode:
         left = self.parse_not()
-        while self.peek() and self.peek()[0] not in {"OR", "RPAREN"}:
-            if self.peek()[0] == "AND":
+        while (tok := self.peek()) is not None and tok[0] not in {"OR", "RPAREN"}:
+            if tok[0] == "AND":
                 self.consume("AND")
             right = self.parse_not()
             left = And(left, right)
         return left
 
     def parse_not(self) -> QueryNode:
-        if self.peek() and self.peek()[0] == "NOT":
+        if (tok := self.peek()) is not None and tok[0] == "NOT":
             self.consume("NOT")
             target = self.parse_primary()
             return Not(target)

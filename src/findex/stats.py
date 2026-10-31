@@ -29,7 +29,7 @@ def run_lazy(source: str | Path, limit: int | None = None) -> StatsResult:
 
     doc_count = 0
     token_count = 0
-    vocab = Counter()
+    vocab: Counter[str] = Counter()
 
     for doc in iter_documents(source, limit=limit):
         doc_count += 1
@@ -58,15 +58,13 @@ def run_eager(source: str | Path, limit: int | None = None) -> StatsResult:
     tracemalloc.reset_peak()
     start = time.perf_counter()
 
-    # Load all documents into memory
     documents = list(iter_documents(source, limit=limit))
 
-    # Load all tokens for all documents into lists
     all_tokens: list[str] = []
     for doc in documents:
         all_tokens.extend(list(tokenize(doc.text)))
 
-    vocab = Counter(all_tokens)
+    vocab: Counter[str] = Counter(all_tokens)
 
     elapsed = time.perf_counter() - start
     _, peak_bytes = tracemalloc.get_traced_memory()
@@ -99,50 +97,26 @@ def print_comparison(lazy_res: StatsResult, eager_res: StatsResult) -> None:
     print("\n" + "=" * 60)
     print("EAGER vs LAZY COMPARISON")
     print("=" * 60)
-    print(
-        "| Metric / Mode            | Eager (lists)         | Lazy (generators)     |"
-    )
-    print(
-        "|--------------------------|-----------------------|-----------------------|"
-    )
-    print(
-        f"| Documents processed      | {eager_res.doc_count:<21,}| {lazy_res.doc_count:<21,}|"
-    )
-    print(
-        f"| Total tokens             | {eager_res.token_count:<21,}| {lazy_res.token_count:<21,}|"
-    )
-    print(
-        f"| Vocabulary size          | {eager_res.vocab_size:<21,}| {lazy_res.vocab_size:<21,}|"
-    )
-    print(
-        f"| Elapsed time (s)         | {eager_res.elapsed_sec:<21.4f}| {lazy_res.elapsed_sec:<21.4f}|"
-    )
-    print(
-        f"| Peak memory (MB)         | {eager_res.peak_memory_mb:<21.2f}| {lazy_res.peak_memory_mb:<21.2f}|"
-    )
+    print("| Metric / Mode            | Eager (lists)         | Lazy (generators)     |")
+    print("|--------------------------|-----------------------|-----------------------|")
+    print(f"| Documents processed      | {eager_res.doc_count:<21,}| {lazy_res.doc_count:<21,}|")
+    print(f"| Total tokens             | {eager_res.token_count:<21,}| {lazy_res.token_count:<21,}|")
+    print(f"| Vocabulary size          | {eager_res.vocab_size:<21,}| {lazy_res.vocab_size:<21,}|")
+    print(f"| Elapsed time (s)         | {eager_res.elapsed_sec:<21.4f}| {lazy_res.elapsed_sec:<21.4f}|")
+    print(f"| Peak memory (MB)         | {eager_res.peak_memory_mb:<21.2f}| {lazy_res.peak_memory_mb:<21.2f}|")
     savings = (
-        (
-            (eager_res.peak_memory_mb - lazy_res.peak_memory_mb)
-            / eager_res.peak_memory_mb
-        )
-        * 100
+        ((eager_res.peak_memory_mb - lazy_res.peak_memory_mb) / eager_res.peak_memory_mb) * 100
         if eager_res.peak_memory_mb
-        else 0
+        else 0.0
     )
     print(f"\nMemory saved with generators: {savings:.1f}%\n")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="findex corpus statistics and memory benchmark"
-    )
+    parser = argparse.ArgumentParser(description="findex corpus statistics and memory benchmark")
     parser.add_argument("source", type=str, help="Path to corpus directory or file")
-    parser.add_argument(
-        "--limit", type=int, default=None, help="Max documents to process"
-    )
-    parser.add_argument(
-        "--eager", action="store_true", help="Run eager in-memory list version"
-    )
+    parser.add_argument("--limit", type=int, default=None, help="Max documents to process")
+    parser.add_argument("--eager", action="store_true", help="Run eager in-memory list version")
     parser.add_argument(
         "--compare", action="store_true", help="Run both lazy and eager and compare"
     )
