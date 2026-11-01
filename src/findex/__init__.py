@@ -11,11 +11,20 @@ from findex.index import (
     save_index,
 )
 from findex.models import DocMeta, Posting, SearchResult
+from findex.numpy_index import (
+    NumPyIndex,
+    NumPyPostings,
+    rank_bm25_numpy,
+    rank_tfidf_numpy,
+)
 from findex.query import And, Not, Or, Phrase, QueryNode, Term, parse_query
 from findex.ranking import BM25Scorer, Scorer, TfIdfScorer, rank_documents
 from findex.search import execute_query, search_ranked, timed
+from findex.semantic import SemanticEngine, SemanticIndex, chunk_text, hybrid_search
 from findex.snippets import generate_snippet
 from findex.tokenizer import normalize_text, tokenize
+
+__version__ = "1.0.0"
 
 __all__ = [
     "And",
@@ -25,17 +34,24 @@ __all__ = [
     "Index",
     "InvertedIndex",
     "Not",
+    "NumPyIndex",
+    "NumPyPostings",
     "Or",
     "Phrase",
     "Posting",
     "QueryNode",
     "Scorer",
     "SearchResult",
+    "SemanticEngine",
+    "SemanticIndex",
     "Term",
     "TfIdfScorer",
+    "__version__",
     "build_index",
+    "chunk_text",
     "execute_query",
     "generate_snippet",
+    "hybrid_search",
     "iter_documents",
     "load_index",
     "merge_and",
@@ -44,7 +60,9 @@ __all__ = [
     "normalize_text",
     "open_index",
     "parse_query",
+    "rank_bm25_numpy",
     "rank_documents",
+    "rank_tfidf_numpy",
     "save_index",
     "search_ranked",
     "set_and",

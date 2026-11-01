@@ -20,10 +20,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from findex.index import Index
+from findex.numpy_index import NumPyIndex
 from findex.ranking import BM25Scorer, TfIdfScorer, rank_documents
+from findex.semantic import SemanticEngine, SemanticIndex, hybrid_search
 from findex.snippets import generate_snippet
 from findex.tokenizer import normalize_text, tokenize
-from findex.web.dependencies import get_index, get_optional_index
+from findex.web.dependencies import (
+    get_index,
+    get_optional_index,
+    get_optional_semantic_index,
+    get_semantic_engine,
+)
 from findex.web.lifespan import lifespan
 from findex.web.schemas import (
     DocumentResponse,
@@ -232,19 +239,26 @@ def create_app() -> FastAPI:
     def search_endpoint(
         q: Annotated[str, Query(min_length=1, max_length=200, description="Пошуковий запит")],
         index: Annotated[Index, Depends(get_index)],
+        semantic_engine: Annotated[
+            SemanticEngine,
+            Depends(get_semantic_engine),
+        ],
         k: Annotated[int, Query(ge=1, le=100, description="Кількість результатів на сторінку")] = 10,
         page: Annotated[int, Query(ge=1, description="Номер сторінки результатів")] = 1,
         scorer: Annotated[Literal["bm25", "tfidf"], Query(description="Алгоритм ранжування")] = "bm25",
+        mode: Annotated[
+            Literal["keyword", "semantic", "hybrid"],
+            Query(description="Режим пошуку: keyword, semantic або hybrid"),
+        ] = "keyword",
+        semantic_index: Annotated[
+            SemanticIndex | None,
+            Depends(get_optional_semantic_index),
+        ] = None,
     ) -> SearchResponse:
-        """Повнотекстовий пошук за алгоритмами BM25 або TF-IDF.
-
-        Маршрут визначено як звичайну синхронну функцію def, завдяки чому FastAPI
-        виконує CPU-інтенсивний розрахунок ранжування у пулі потоків (threadpool)
-        і не блокує головний цикл подій asyncio.
-        """
+        """Повнотекстовий або гібридний пошук (BM25, Semantic, Hybrid RRF)."""
         t0 = time.perf_counter()
         query_terms = list(tokenize(q))
-        if not query_terms:
+        if not query_terms and mode == "keyword":
             return SearchResponse(
                 query=q,
                 total=0,
@@ -255,8 +269,14 @@ def create_app() -> FastAPI:
                 results=[],
             )
 
-        scorer_instance = BM25Scorer() if scorer == "bm25" else TfIdfScorer()
-        ranked = rank_documents(query_terms, index, scorer_instance, top_k=index.num_docs)
+        if mode == "semantic" and semantic_index is not None:
+            ranked = semantic_engine.search_semantic(q, semantic_index, index.doc_meta, top_k=index.num_docs)
+        elif mode == "hybrid" and semantic_index is not None:
+            np_idx = NumPyIndex.from_index(index)
+            ranked = hybrid_search(q, np_idx, semantic_index, semantic_engine, top_k=index.num_docs)
+        else:
+            scorer_instance = BM25Scorer() if scorer == "bm25" else TfIdfScorer()
+            ranked = rank_documents(query_terms, index, scorer_instance, top_k=index.num_docs)
 
         total_results = len(ranked)
         total_pages = max(1, math.ceil(total_results / k)) if total_results > 0 else 0
@@ -268,7 +288,7 @@ def create_app() -> FastAPI:
             meta = index.doc_meta.get(cand.doc_id)
             title = meta.title if meta else f"Документ #{cand.doc_id}"
             text, url = _get_doc_text_and_url(index, cand.doc_id)
-            snippet = generate_snippet(text, query_terms, highlight=False)
+            snippet = cand.snippet if cand.snippet else generate_snippet(text, query_terms, highlight=False)
             results.append(
                 SearchResult(
                     doc_id=cand.doc_id,
@@ -360,10 +380,13 @@ def create_app() -> FastAPI:
     def web_ui_index(
         request: Request,
         index: Annotated[Index | None, Depends(get_optional_index)],
+        semantic_engine: Annotated[SemanticEngine, Depends(get_semantic_engine)],
+        semantic_index: Annotated[SemanticIndex | None, Depends(get_optional_semantic_index)] = None,
         q: str | None = None,
         k: int = 10,
         page: int = 1,
         scorer: Literal["bm25", "tfidf"] = "bm25",
+        mode: Literal["keyword", "semantic", "hybrid"] = "keyword",
     ) -> Response:
         """Головна веб-сторінка пошуку."""
         query = (q or "").strip()
@@ -381,13 +404,21 @@ def create_app() -> FastAPI:
                     "total_pages": 0,
                     "elapsed_ms": 0.0,
                     "scorer": scorer,
+                    "mode": mode,
                 },
             )
 
         t0 = time.perf_counter()
         query_terms = list(tokenize(query))
-        scorer_instance = BM25Scorer() if scorer == "bm25" else TfIdfScorer()
-        ranked = rank_documents(query_terms, index, scorer_instance, top_k=index.num_docs)
+
+        if mode == "semantic" and semantic_index is not None:
+            ranked = semantic_engine.search_semantic(query, semantic_index, index.doc_meta, top_k=index.num_docs)
+        elif mode == "hybrid" and semantic_index is not None:
+            np_idx = NumPyIndex.from_index(index)
+            ranked = hybrid_search(query, np_idx, semantic_index, semantic_engine, top_k=index.num_docs)
+        else:
+            scorer_instance = BM25Scorer() if scorer == "bm25" else TfIdfScorer()
+            ranked = rank_documents(query_terms, index, scorer_instance, top_k=index.num_docs)
 
         total_results = len(ranked)
         total_pages = max(1, math.ceil(total_results / k)) if total_results > 0 else 0
@@ -399,7 +430,7 @@ def create_app() -> FastAPI:
             meta = index.doc_meta.get(cand.doc_id)
             title = meta.title if meta else f"Документ #{cand.doc_id}"
             text, url = _get_doc_text_and_url(index, cand.doc_id)
-            html_snippet = _generate_html_snippet(text, query_terms)
+            html_snippet = _generate_html_snippet(text, query_terms) if not cand.snippet else cand.snippet
             results_data.append(
                 {
                     "doc_id": cand.doc_id,
@@ -423,6 +454,7 @@ def create_app() -> FastAPI:
                 "total_pages": total_pages,
                 "elapsed_ms": elapsed_ms,
                 "scorer": scorer,
+                "mode": mode,
             },
         )
 

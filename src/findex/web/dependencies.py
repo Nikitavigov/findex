@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 
 from findex.index import Index
+from findex.semantic import SemanticEngine, SemanticIndex
 from findex.web.config import Settings
 
 
@@ -17,6 +18,18 @@ from findex.web.config import Settings
 def get_settings() -> Settings:
     """Повертає кешований екземпляр налаштувань сервісу."""
     return Settings()
+
+
+@lru_cache(maxsize=1)
+def get_semantic_engine() -> SemanticEngine:
+    """Повертає глобальний екземпляр SemanticEngine."""
+    return SemanticEngine()
+
+
+def get_optional_semantic_index(request: Request) -> SemanticIndex | None:
+    """Повертає семантичний індекс зі стану застосунку або None, якщо не завантажений."""
+    res = getattr(request.app.state, "semantic_index", None)
+    return res if isinstance(res, SemanticIndex) else None
 
 
 def get_optional_index(request: Request) -> Index | None:

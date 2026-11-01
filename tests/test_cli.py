@@ -20,6 +20,7 @@ def test_cli_help() -> None:
     assert "stats" in clean_out
     assert "crawl" in clean_out
     assert "serve" in clean_out
+    assert "embed" in clean_out
 
 
 def test_cli_crawl_help() -> None:

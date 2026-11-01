@@ -1,7 +1,7 @@
 [project]
 name = "findex"
-version = "0.7.0"
-description = "Пошуковий рушій на чистому Python з FastAPI, Pydantic, Web UI та Typer CLI"
+version = "1.0.0"
+description = "Високопродуктивний гібридний пошуковий рушій на Python з NumPy та семантичним пошуком"
 readme = "README.md"
 authors = [
     { name = "Nikitavigov", email = "nikitavigov06@gmail.com" }
@@ -9,8 +9,10 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
+    "fastembed>=0.9.1",
     "httpx>=0.28.1",
     "jinja2>=3.1.4",
+    "numpy>=2.5.4",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "python-multipart>=0.0.12",
@@ -34,6 +36,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
+    "pytest-benchmark>=5.3.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]

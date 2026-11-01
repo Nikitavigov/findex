@@ -1,0 +1,52 @@
+<svg width="800" height="300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff7a45"/>
+      <stop offset="100%" stop-color="#ffa940"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#13c2c2"/>
+      <stop offset="100%" stop-color="#36cfc9"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1890ff"/>
+      <stop offset="100%" stop-color="#69c0ff"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .title { font-family: sans-serif; font-size: 16px; font-weight: bold; fill: #1f2937; }
+    .label { font-family: monospace; font-size: 12px; fill: #ffffff; }
+    .subtext { font-family: sans-serif; font-size: 11px; fill: #6b7280; }
+  </style>
+
+  <rect width="800" height="300" fill="#f9fafb" rx="8"/>
+  <text x="20" y="30" class="title">findex Profiling Flamegraph — cProfile Hotspots</text>
+  <text x="20" y="50" class="subtext">Розподіл часу обчислень при повнотекстовому ранжуванні (Lab 8)</text>
+
+  <!-- Root level: findex.search -->
+  <rect x="20" y="70" width="760" height="35" rx="4" fill="#4b5563"/>
+  <text x="30" y="92" class="label">findex.search: search_ranked() [100% total time]</text>
+
+  <!-- Level 1: rank_documents vs overhead -->
+  <rect x="20" y="115" width="620" height="35" rx="4" fill="url(#g1)"/>
+  <text x="30" y="137" class="label">rank_documents() + BM25Scorer.score() [81.5% Python CPU loop]</text>
+
+  <rect x="650" y="115" width="130" height="35" rx="4" fill="#9ca3af"/>
+  <text x="655" y="137" class="label">snippets/overhead [18.5%]</text>
+
+  <!-- Level 2: Inside Python Scorer Hotspots -->
+  <rect x="20" y="160" width="280" height="35" rx="4" fill="#f5222d"/>
+  <text x="30" y="182" class="label">math.log &amp; arithmetic boxing [36.8%]</text>
+
+  <rect x="310" y="160" width="210" height="35" rx="4" fill="#fa8c16"/>
+  <text x="320" y="182" class="label">heapq.nlargest() [27.6%]</text>
+
+  <rect x="530" y="160" width="110" height="35" rx="4" fill="#faad14"/>
+  <text x="535" y="182" class="label">attr lookup [17.1%]</text>
+
+  <!-- Level 3: NumPy Vectorized Alternative -->
+  <rect x="20" y="215" width="760" height="40" rx="4" fill="url(#g2)"/>
+  <text x="30" y="240" class="label">NumPy Vectorized Kernel (ufuncs + np.argpartition): 10-40x faster compiled C-loop</text>
+
+  <text x="20" y="285" class="subtext">Згенеровано скриптом scripts/benchmark_numpy.py для Лабораторної роботи №8</text>
+</svg>

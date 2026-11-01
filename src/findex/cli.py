@@ -14,11 +14,14 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from findex.corpus import iter_documents
 from findex.crawler import crawl
 from findex.index import load_index, save_index
+from findex.numpy_index import NumPyIndex
 from findex.parallel import build_index_parallel
 from findex.ranking import BM25Scorer, TfIdfScorer
 from findex.search import search_ranked
+from findex.semantic import SemanticEngine, SemanticIndex, hybrid_search
 from findex.stats import run_eager, run_lazy
 
 app = typer.Typer(
@@ -136,6 +139,14 @@ def search_command(
         Literal["bm25", "tfidf"],
         typer.Option("--scorer", "-s", help="Алгоритм оцінки релевантності (bm25 або tfidf)."),
     ] = "bm25",
+    mode: Annotated[
+        Literal["keyword", "semantic", "hybrid"],
+        typer.Option("--mode", "-m", help="Режим пошуку: keyword (BM25/NumPy), semantic або hybrid (RRF)."),
+    ] = "keyword",
+    embeddings_path: Annotated[
+        Path,
+        typer.Option("--embeddings", help="Шлях до файлу векторних ембедингів (.npz) для semantic/hybrid."),
+    ] = Path("data/embeddings.npz"),
     limit: Annotated[
         int,
         typer.Option("--limit", "-k", help="Кількість найрелевантніших результатів."),
@@ -148,7 +159,7 @@ def search_command(
         ),
     ] = False,
 ) -> None:
-    """Виконати повнотекстовий ранжований пошук за запитом."""
+    """Виконати повнотекстовий або гібридний ранжований пошук за запитом."""
     if not index_path.exists():
         err_console.print(f"[red]Помилка:[/red] Файл індексу '{index_path}' не знайдено.")
         raise typer.Exit(code=1)
@@ -159,16 +170,33 @@ def search_command(
         err_console.print(f"[red]Помилка завантаження індексу:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    scorer = BM25Scorer() if scorer_name == "bm25" else TfIdfScorer()
     t0 = time.perf_counter()
-    results = search_ranked(query, index, scorer=scorer, top_k=limit)
+    if mode == "semantic":
+        if not embeddings_path.exists():
+            err_console.print(f"[red]Помилка:[/red] Файл векторних ембедингів '{embeddings_path}' не знайдено. Спочатку виконайте findex embed.")
+            raise typer.Exit(code=1)
+        sem_index = SemanticIndex.load(embeddings_path)
+        engine = SemanticEngine(model_name=sem_index.model_name)
+        results = engine.search_semantic(query, sem_index, index.doc_meta, top_k=limit)
+    elif mode == "hybrid":
+        if not embeddings_path.exists():
+            err_console.print(f"[red]Помилка:[/red] Файл векторних ембедингів '{embeddings_path}' не знайдено. Спочатку виконайте findex embed.")
+            raise typer.Exit(code=1)
+        np_index = NumPyIndex.from_index(index)
+        sem_index = SemanticIndex.load(embeddings_path)
+        engine = SemanticEngine(model_name=sem_index.model_name)
+        results = hybrid_search(query, np_index, sem_index, engine, top_k=limit)
+    else:
+        scorer = BM25Scorer() if scorer_name == "bm25" else TfIdfScorer()
+        results = search_ranked(query, index, scorer=scorer, top_k=limit)
+
     elapsed_ms = (time.perf_counter() - t0) * 1000
 
     if as_json:
         output_data = [
             {
                 "rank": rank,
-                "score": round(r.score, 4),
+                "score": round(r.score, 5),
                 "doc_id": r.doc_id,
                 "title": r.title,
                 "source": r.source_name,
@@ -180,7 +208,7 @@ def search_command(
         return
 
     table = Table(
-        title=f"Результати пошуку: '{query}' (Скорер: {scorer_name.upper()}, час: {elapsed_ms:.2f} мс)",
+        title=f"Результати пошуку ({mode.upper()}, {scorer_name.upper()}): '{query}' (час: {elapsed_ms:.2f} мс)",
         show_lines=True,
     )
     table.add_column("№", style="cyan", width=4, justify="right")
@@ -200,6 +228,63 @@ def search_command(
         )
 
     console.print(table)
+
+
+@app.command(name="embed")
+def embed_command(
+    source: Annotated[Path, typer.Argument(help="Каталог або файл корпусу для побудови ембедингів.")],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Шлях збереження файлу векторних ембедингів (.npz)."),
+    ] = Path("data/embeddings.npz"),
+    max_words: Annotated[
+        int,
+        typer.Option("--max-words", "-w", help="Максимальна довжина чанка в словах."),
+    ] = 120,
+    overlap: Annotated[
+        int,
+        typer.Option("--overlap", help="Перекриття чанків у словах."),
+    ] = 25,
+) -> None:
+    """Обчислити семантичні векторні ембединги для документів корпусу (Lab 8)."""
+    if not source.exists():
+        err_console.print(f"[red]Помилка:[/red] Шлях до корпусу '{source}' не існує.")
+        raise typer.Exit(code=1)
+
+    t0 = time.perf_counter()
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=err_console,
+    ) as progress:
+        task = progress.add_task("Зчитування документів корпусу...", total=None)
+        doc_pairs: list[tuple[int, str]] = []
+        for doc in iter_documents(source):
+            try:
+                d_id = int(doc.doc_id)
+            except ValueError:
+                d_id = len(doc_pairs) + 1
+            doc_pairs.append((d_id, doc.text))
+
+        progress.update(task, description=f"Обчислення нейромережевих ембедингів для {len(doc_pairs)} документів...")
+        engine = SemanticEngine()
+        sem_index = engine.build_index(doc_pairs, max_words=max_words, overlap=overlap)
+
+        progress.update(task, description="Збереження векторного індексу...")
+        sem_index.save(out)
+
+    elapsed = time.perf_counter() - t0
+    size_mb = out.stat().st_size / (1024 * 1024)
+    summary_text = (
+        f"[green]Генерацію векторних ембедингів успішно завершено![/green]\n\n"
+        f"• Документів оброблено:   [bold]{len(doc_pairs):,}[/bold]\n"
+        f"• Згенеровано чанків:     [bold]{len(sem_index.chunk_texts):,}[/bold]\n"
+        f"• Розмірність векторів:   [bold]{sem_index.matrix.shape[1]}[/bold] ({sem_index.model_name})\n"
+        f"• Загальний час:          [bold]{elapsed:.2f} с[/bold]\n"
+        f"• Розмір файлу:           [bold]{size_mb:.2f} MB[/bold]\n"
+        f"• Збережено у:            [cyan]{out}[/cyan]"
+    )
+    console.print(Panel(summary_text, title="findex embed summary", expand=False))
 
 
 @app.command(name="stats")

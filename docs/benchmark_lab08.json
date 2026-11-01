@@ -1,0 +1,134 @@
+{
+  "speedup_benchmarks": [
+    {
+      "query_type": "Частий термін ('section', 259 doc)",
+      "py_ms": 0.653,
+      "np_ms": 0.033,
+      "speedup": 20.04
+    },
+    {
+      "query_type": "Рідкісний термін ('vistier', 1 doc)",
+      "py_ms": 0.004,
+      "np_ms": 0.018,
+      "speedup": 0.21
+    },
+    {
+      "query_type": "Запит із 3 термів ('system', 'search', 'section')",
+      "py_ms": 0.487,
+      "np_ms": 0.054,
+      "speedup": 9.05
+    }
+  ],
+  "precision_evaluation": [
+    {
+      "query": "system architecture",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "information retrieval",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "computer science history",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "data search algorithm",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "programming languages python",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "natural language processing",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "index and inverted file",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "web documents crawler",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "vector space model",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "performance optimization code",
+      "type": "Прямий термін",
+      "p_keyword": 0.8,
+      "p_semantic": 0.8,
+      "p_hybrid": 1.0
+    },
+    {
+      "query": "how to make software execute faster without lags",
+      "type": "Перефразований (без слів)",
+      "p_keyword": 0.2,
+      "p_semantic": 0.8,
+      "p_hybrid": 0.8
+    },
+    {
+      "query": "electronic calculating machines history",
+      "type": "Перефразований (без слів)",
+      "p_keyword": 0.2,
+      "p_semantic": 0.8,
+      "p_hybrid": 0.8
+    },
+    {
+      "query": "finding knowledge inside huge collections of texts",
+      "type": "Перефразований (без слів)",
+      "p_keyword": 0.2,
+      "p_semantic": 0.8,
+      "p_hybrid": 0.8
+    },
+    {
+      "query": "translating human speech into computational meaning",
+      "type": "Перефразований (без слів)",
+      "p_keyword": 0.2,
+      "p_semantic": 0.8,
+      "p_hybrid": 0.8
+    },
+    {
+      "query": "organizing records in memory for quick lookups",
+      "type": "Перефразований (без слів)",
+      "p_keyword": 0.2,
+      "p_semantic": 0.8,
+      "p_hybrid": 0.8
+    }
+  ],
+  "averages": {
+    "p5_keyword": 0.6,
+    "p5_semantic": 0.8,
+    "p5_hybrid": 0.93
+  }
+}

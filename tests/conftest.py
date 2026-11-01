@@ -51,3 +51,10 @@ def saved_index_path(tmp_path: Path, sample_index: Index) -> Path:
     idx_path = tmp_path / "index.bin"
     save_index(sample_index, idx_path, fmt="pickle")
     return idx_path
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Сумісність pytest_benchmark з Pytest 9+ (виправлення відсутності _nodeid)."""
+    for item in items:
+        if not hasattr(item, "_nodeid"):
+            item._nodeid = item.nodeid

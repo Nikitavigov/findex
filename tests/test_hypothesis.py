@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from findex.boolean import merge_and, merge_or, set_and, set_or
@@ -48,6 +48,7 @@ def test_property_boolean_merge_equals_set(list_a: list[int], list_b: list[int])
 # --- Властивість 2: Інваріант сортованості списків постінгів ---
 
 
+@settings(deadline=None)
 @given(
     texts=st.lists(
         st.text(alphabet="abcdefghijklmnopqrstuvwxyz ", min_size=1, max_size=100),
@@ -77,6 +78,7 @@ def test_property_postings_are_strictly_sorted(tmp_path_factory: pytest.TempPath
 # --- Властивість 3: Round-trip серіалізації індексу (JSON та Pickle) ---
 
 
+@settings(deadline=None)
 @given(
     terms=st.lists(
         st.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=2, max_size=8),

@@ -38,6 +38,15 @@
 
         <div class="search-options">
           <label class="option-label">
+            Режим:
+            <select name="mode" class="select-control">
+              <option value="keyword" {% if mode == 'keyword' %}selected{% endif %}>Ключові слова (BM25)</option>
+              <option value="semantic" {% if mode == 'semantic' %}selected{% endif %}>Векторний (Semantic)</option>
+              <option value="hybrid" {% if mode == 'hybrid' %}selected{% endif %}>Гібридний (BM25 + Semantic RRF)</option>
+            </select>
+          </label>
+
+          <label class="option-label">
             Скорер:
             <select name="scorer" class="select-control">
               <option value="bm25" {% if scorer == 'bm25' %}selected{% endif %}>BM25</option>

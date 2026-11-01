@@ -7,6 +7,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Асинхронний контекстний менеджер життєвого циклу веб-сервісу."""
     settings = get_settings()
     app.state.index = None
+    app.state.semantic_index = None
 
     if settings.index_path.exists():
         try:
@@ -41,8 +43,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             settings.index_path,
         )
 
+    # Завантаження векторних ембедингів для семантичного/гібридного пошуку
+    emb_path = Path("data/embeddings.npz")
+    if emb_path.exists():
+        try:
+            from findex.semantic import SemanticIndex
+            app.state.semantic_index = SemanticIndex.load(emb_path)
+            logger.info("Векторні ембединги успішно завантажено з %s", emb_path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Не вдалося завантажити ембединги з %s: %s", emb_path, exc)
+            app.state.semantic_index = None
+
     try:
         yield
     finally:
         logger.info("Зупинка веб-сервісу findex...")
         app.state.index = None
+        app.state.semantic_index = None
